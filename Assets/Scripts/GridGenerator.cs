@@ -21,7 +21,7 @@ public struct Cell
 
     public static bool operator!= (Cell A, Cell B)
     {
-        return A.x != B.x && A.y != B.y;
+        return A.x != B.x || A.y != B.y;
     }
 
     public override bool Equals(object obj)
@@ -42,6 +42,7 @@ public struct Wall
 {
     public Cell cell;
     public WallDir dir;
+
     
     public Wall(Cell cell, WallDir dir)
     {
@@ -115,11 +116,12 @@ public class GridGenerator : MonoBehaviour
     public float cellSize;
     public Transform noteCursor;
     public static Maze instance;
+    private List<Transform> spawnedElements = new List<Transform>();
     
 
     private void Start()
     {
-        instance = GenerateMaze();
+        StartCoroutine(GenerateMaze());
         DisplayMaze(instance);
     }
 
@@ -193,12 +195,17 @@ public class GridGenerator : MonoBehaviour
         }
     }
 
+    private List<Cell> debugCells = new List<Cell>();
+    public Transform debugPrefab;
+
     void PopulateMaze2(Maze maze, List<Cell> visitedCells, List<Cell> remainingCells)
     {
         Cell cursor = remainingCells[Random.Range(0, remainingCells.Count)];
         remainingCells.Remove(cursor);
         List<Cell> path = new List<Cell>();
         path.Add(cursor);
+        
+        //debugCells.Add(cursor);
         while(!visitedCells.Contains(cursor))
         {
             List<int> availableDirections = new List<int>();
@@ -219,13 +226,15 @@ public class GridGenerator : MonoBehaviour
             cursor.x += dx;
             cursor.y += dy;
             path.Add(cursor);
+            //debugCells.Add(cursor);
         }
         RemoveWalls(maze, path, visitedCells, remainingCells);
     }
 
-    public Maze GenerateMaze()
+    public IEnumerator GenerateMaze()
     {
         Maze result = new Maze();
+        instance = result;
         result.w = w;
         result.h = h;
         Cell currentCell = new Cell(Random.Range(0, w), Random.Range(0, h));
@@ -246,20 +255,24 @@ public class GridGenerator : MonoBehaviour
             remainingCells.Add(new Cell(i % w, i%h));
 
         int genSteps = 0;
-        while(remainingCells.Count > 0 && genSteps < 5000)
+        while(remainingCells.Count > 0 && genSteps < 0)
         {
             genSteps++;
             PopulateMaze(result, visitedCells, ref currentCell);
             remainingCells.Remove(currentCell);
         }
-        while(remainingCells.Count > 0 && genSteps < 20000)
+        while(remainingCells.Count > 0)
         {
             genSteps++;
+            
             PopulateMaze2(result, visitedCells, remainingCells);
-            //remainingCells.Remove(currentCell);
         }
+        foreach(Transform element in spawnedElements)
+            Destroy(element.gameObject);
+        spawnedElements.Clear();
+        DisplayMaze(result);
+        yield return null;
         Debug.Log(genSteps);
-        return result;
     }
 
     private void DisplayMaze(Maze maze)
@@ -268,7 +281,9 @@ public class GridGenerator : MonoBehaviour
         {
             for(int j=0; j<h; j++)
             {
-                Instantiate(emptyCellPrefab, transform).localPosition = new Vector3(i * cellSize, j * cellSize);
+                Transform emptyCell = Instantiate(emptyCellPrefab, transform);
+                emptyCell.localPosition = new Vector3(i * cellSize, j * cellSize);
+                spawnedElements.Add(emptyCell);
             }
         }
         foreach(Wall wall in maze.walls)
@@ -288,7 +303,15 @@ public class GridGenerator : MonoBehaviour
             Transform instance = Instantiate(wallPrefab, Vector3.zero, rotation, transform);
             instance.localPosition = position;
             instance.name = "Wall " + wall.cell.x + " " + wall.cell.y;
+            spawnedElements.Add(instance);
         }
+        foreach(Cell cell in debugCells)
+        {
+            Transform instance = Instantiate(debugPrefab, transform );
+            instance.localPosition = new Vector3(cell.x, cell.y);
+            spawnedElements.Add(instance);
+        }
+        debugCells.Clear();
         
     }
 
