@@ -14,6 +14,16 @@ public struct Cell
         this.y = y;
     }
 
+    public static bool operator== (Cell A, Cell B)
+    {
+        return A.x == B.x && A.y == B.y;
+    }
+
+    public static bool operator!= (Cell A, Cell B)
+    {
+        return A.x != B.x && A.y != B.y;
+    }
+
     public override bool Equals(object obj)
     {
         Cell other = (Cell)obj;
@@ -30,25 +40,24 @@ public struct Cell
 
 public struct Wall
 {
-    public int id;
+    public Cell cell;
     public WallDir dir;
-    public static Wall CreateWall(int id, WallDir dir)
+    
+    public Wall(Cell cell, WallDir dir)
     {
-        Wall result = new Wall();
-        result.id = id;
-        result.dir = dir;
-        return result;
-    }
+        this.cell = cell;
+        this.dir = dir;
+    } 
 
     public override bool Equals(object obj)
     {
         Wall other = (Wall)obj;
-        return id == other.id && dir == other.dir;
+        return cell == other.cell && dir == other.dir;
     }
 
     public override int GetHashCode() {
         const uint hash = 0x9e3779b9;
-        var seed = id + hash;
+        var seed = cell.GetHashCode() + hash;
         seed ^= (int)dir + hash + (seed << 6) + (seed >> 2);
         return (int)seed;
     }
@@ -78,19 +87,19 @@ public class Maze
         switch(direction)
         {
             case 0:
-                wall.id = nextCell.x + nextCell.y * (w + 1);
+                wall.cell = nextCell;
                 wall.dir = WallDir.Vertical;
                 break;
             case 1: 
-                wall.id = nextCell.x + nextCell.y * w;
+                wall.cell = nextCell;
                 wall.dir = WallDir.Horizontal;
                 break;
             case 2:
-                wall.id = cell.x + cell.y * (w + 1);
+                wall.cell = cell;
                 wall.dir = WallDir.Vertical;
                 break;
             case 3: 
-                wall.id = cell.x + cell.y * w;
+                wall.cell = cell;
                 wall.dir = WallDir.Horizontal;
                 break;
         }
@@ -125,52 +134,81 @@ public class GridGenerator : MonoBehaviour
             }
         }
     }
-
-    public Maze GenerateMaze()
+    
+    public void PopulateMaze(Maze maze, List<Cell> visitedCells, ref Cell currentCell)
     {
-        Maze result = new Maze();
-        result.w = w;
-        result.h = h;
-        for(int i=0; i<w; i++)
+        int dx = 0;
+        int dy = 0;
+        List<int> availableDirections = new List<int>();
+        if(currentCell.x < w - 1) availableDirections.Add(0);
+        if(currentCell.y < h - 1) availableDirections.Add(1);
+        if(currentCell.x > 0) availableDirections.Add(2);
+        if(currentCell.y > 0) availableDirections.Add(3);
+        
+        int direction = availableDirections[Random.Range(0, availableDirections.Count)];
+        switch(direction)
         {
-            for(int j=0; j<h; j++)
-            {
-                Instantiate(emptyCellPrefab, transform).localPosition = new Vector3(i * cellSize, j * cellSize);
-            }
-        }
-        Cell currentCell = new Cell(Random.Range(0, w), Random.Range(0, h));
-        for(int i=0; i <= w; i++)
-        {
-            for(int j=0; j <= h; j++)
-            {
-                if(i < w)
-                    result.walls.Add(Wall.CreateWall(i + j * w, WallDir.Horizontal));
-                if(j < h)
-                    result.walls.Add(Wall.CreateWall(i + j * (w + 1), WallDir.Vertical));
-            }
-        }
-        List<Cell> visitedCells = new List<Cell>();
-        for(int i=4; i<6; i++)
-        {
-            for(int j=2; j<4; j++)
-            {
-                visitedCells.Add(new Cell(i, j));
-            }
+            case 0: dx = 1; break;
+            case 1: dy = 1; break;
+            case 2: dx = -1; break;
+            case 3: dy = -1; break;
         }
 
-        int genSteps = 0;
-        while(visitedCells.Count < w * h && genSteps < 100000)
+        Cell nextCell = new Cell(currentCell.x + dx, currentCell.y + dy);
+        if(!visitedCells.Contains(nextCell))
         {
-            genSteps++;
-            int dx = 0;
-            int dy = 0;
+            visitedCells.Add(nextCell);
+            switch(direction)
+            {
+                case 0: maze.walls.Remove(new Wall(nextCell, WallDir.Vertical)); break;
+                case 1: maze.walls.Remove(new Wall(nextCell, WallDir.Horizontal)); break;
+                case 2: maze.walls.Remove(new Wall(currentCell, WallDir.Vertical)); break;
+                case 3: maze.walls.Remove(new Wall(currentCell, WallDir.Horizontal)); break;
+            }
+        }
+        currentCell = nextCell;
+        noteCursor.localPosition = new Vector3(currentCell.x, currentCell.y, 0);
+    }
+
+    void RemoveWalls(Maze maze, List<Cell> path, List<Cell> visitedCells, List<Cell> remainingCells)
+    {
+        for(int i=0; i<path.Count - 1; i++)
+        {
+            Cell A = path[i];
+            Cell B = path[i + 1];
+            if(!visitedCells.Contains(B) || i == path.Count - 2)
+            {
+                int dx = B.x - A.x;
+                int dy = B.y - A.y;
+                WallDir dir = WallDir.Horizontal;
+                if(dx != 0)
+                    dir = WallDir.Vertical;
+                if(dx < 0 || dy < 0)
+                    maze.walls.Remove(new Wall(A, dir));
+                else
+                    maze.walls.Remove(new Wall(B, dir));
+                remainingCells.Remove(B);
+                visitedCells.Add(B);
+            }
+        }
+    }
+
+    void PopulateMaze2(Maze maze, List<Cell> visitedCells, List<Cell> remainingCells)
+    {
+        Cell cursor = remainingCells[Random.Range(0, remainingCells.Count)];
+        remainingCells.Remove(cursor);
+        List<Cell> path = new List<Cell>();
+        path.Add(cursor);
+        while(!visitedCells.Contains(cursor))
+        {
             List<int> availableDirections = new List<int>();
-            if(currentCell.x < w - 1) availableDirections.Add(0);
-            if(currentCell.y < h - 1) availableDirections.Add(1);
-            if(currentCell.x > 0) availableDirections.Add(2);
-            if(currentCell.y > 0) availableDirections.Add(3);
+            if(cursor.x < w - 1) availableDirections.Add(0);
+            if(cursor.y < h - 1) availableDirections.Add(1);
+            if(cursor.x > 0) availableDirections.Add(2);
+            if(cursor.y > 0) availableDirections.Add(3);
             
             int direction = availableDirections[Random.Range(0, availableDirections.Count)];
+            int dx = 0, dy = 0;
             switch(direction)
             {
                 case 0: dx = 1; break;
@@ -178,21 +216,47 @@ public class GridGenerator : MonoBehaviour
                 case 2: dx = -1; break;
                 case 3: dy = -1; break;
             }
+            cursor.x += dx;
+            cursor.y += dy;
+            path.Add(cursor);
+        }
+        RemoveWalls(maze, path, visitedCells, remainingCells);
+    }
 
-            Cell nextCell = new Cell(currentCell.x + dx, currentCell.y + dy);
-            if(!visitedCells.Contains(nextCell))
+    public Maze GenerateMaze()
+    {
+        Maze result = new Maze();
+        result.w = w;
+        result.h = h;
+        Cell currentCell = new Cell(Random.Range(0, w), Random.Range(0, h));
+        for(int i=0; i <= w; i++)
+        {
+            for(int j=0; j <= h; j++)
             {
-                visitedCells.Add(nextCell);
-                switch(direction)
-                {
-                    case 0: result.walls.Remove(Wall.CreateWall(nextCell.x + nextCell.y * (w + 1), WallDir.Vertical)); break;
-                    case 1: result.walls.Remove(Wall.CreateWall(nextCell.x + nextCell.y * w, WallDir.Horizontal)); break;
-                    case 2: result.walls.Remove(Wall.CreateWall(currentCell.x + currentCell.y * (w + 1), WallDir.Vertical)); break;
-                    case 3: result.walls.Remove(Wall.CreateWall(currentCell.x + currentCell.y * w, WallDir.Horizontal)); break;
-                }
+                if(i < w)
+                    result.walls.Add(new Wall(new Cell(i, j), WallDir.Horizontal));
+                if(j < h)
+                    result.walls.Add(new Wall(new Cell(i, j), WallDir.Vertical));
             }
-            currentCell = nextCell;
-            noteCursor.localPosition = new Vector3(currentCell.x, currentCell.y, 0);
+        }
+        List<Cell> visitedCells = new List<Cell>();
+        visitedCells.Add(currentCell);
+        List<Cell> remainingCells = new List<Cell>();
+        for(int i=0; i<w * h; i++)
+            remainingCells.Add(new Cell(i % w, i%h));
+
+        int genSteps = 0;
+        while(remainingCells.Count > 0 && genSteps < 5000)
+        {
+            genSteps++;
+            PopulateMaze(result, visitedCells, ref currentCell);
+            remainingCells.Remove(currentCell);
+        }
+        while(remainingCells.Count > 0 && genSteps < 20000)
+        {
+            genSteps++;
+            PopulateMaze2(result, visitedCells, remainingCells);
+            //remainingCells.Remove(currentCell);
         }
         Debug.Log(genSteps);
         return result;
@@ -200,28 +264,30 @@ public class GridGenerator : MonoBehaviour
 
     private void DisplayMaze(Maze maze)
     {
+        for(int i=0; i<w; i++)
+        {
+            for(int j=0; j<h; j++)
+            {
+                Instantiate(emptyCellPrefab, transform).localPosition = new Vector3(i * cellSize, j * cellSize);
+            }
+        }
         foreach(Wall wall in maze.walls)
         {
-            int x = 0, y = 0;
             Vector3 position = Vector3.zero;
             Quaternion rotation = Quaternion.identity;
             switch(wall.dir)
             {
                 case WallDir.Vertical:
-                    x = wall.id % (w + 1);
-                    y = wall.id / (w + 1);
-                    position = new Vector3((x - 0.5f) * cellSize, y * cellSize);
+                    position = new Vector3((wall.cell.x - 0.5f) * cellSize, wall.cell.y * cellSize);
                     break;
                 case WallDir.Horizontal:
-                    x = wall.id % w;
-                    y = wall.id / w;
                     rotation = Quaternion.AngleAxis(90, Vector3.forward);
-                    position = new Vector3(x * cellSize, (y - 0.5f) * cellSize);
+                    position = new Vector3(wall.cell.x * cellSize, (wall.cell.y - 0.5f) * cellSize);
                     break;
             }
             Transform instance = Instantiate(wallPrefab, Vector3.zero, rotation, transform);
             instance.localPosition = position;
-            instance.name = " Wall " + x + " " + y;
+            instance.name = "Wall " + wall.cell.x + " " + wall.cell.y;
         }
         
     }

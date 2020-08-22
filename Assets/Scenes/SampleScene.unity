@@ -204,7 +204,7 @@ Camera:
   m_TargetDisplay: 0
   m_TargetEye: 0
   m_HDR: 1
-  m_AllowMSAA: 0
+  m_AllowMSAA: 1
   m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
   m_OcclusionCulling: 0
@@ -430,8 +430,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f8a1531f0af0c5f4eadc1a870a37e0d9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  w: 10
-  h: 10
+  w: 50
+  h: 50
   emptyCellPrefab: {fileID: 911418385279941171, guid: c4a5f60395314a04fa3e307b62a24304,
     type: 3}
   wallPrefab: {fileID: 7250407389578623108, guid: 43d43dcdc6b3238409917136dc55a387,
