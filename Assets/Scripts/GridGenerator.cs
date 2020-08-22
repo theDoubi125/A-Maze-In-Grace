@@ -201,13 +201,14 @@ public class GridGenerator : MonoBehaviour
     void PopulateMaze2(Maze maze, List<Cell> visitedCells, List<Cell> remainingCells)
     {
         Cell cursor = remainingCells[Random.Range(0, remainingCells.Count)];
+        debugCells.Clear();
         remainingCells.Remove(cursor);
         List<Cell> path = new List<Cell>();
-        path.Add(cursor);
         
-        //debugCells.Add(cursor);
         while(!visitedCells.Contains(cursor))
         {
+            path.Add(cursor);
+            debugCells.Add(cursor);
             List<int> availableDirections = new List<int>();
             if(cursor.x < w - 1) availableDirections.Add(0);
             if(cursor.y < h - 1) availableDirections.Add(1);
@@ -225,8 +226,6 @@ public class GridGenerator : MonoBehaviour
             }
             cursor.x += dx;
             cursor.y += dy;
-            path.Add(cursor);
-            //debugCells.Add(cursor);
         }
         RemoveWalls(maze, path, visitedCells, remainingCells);
     }
@@ -252,7 +251,7 @@ public class GridGenerator : MonoBehaviour
         visitedCells.Add(currentCell);
         List<Cell> remainingCells = new List<Cell>();
         for(int i=0; i<w * h; i++)
-            remainingCells.Add(new Cell(i % w, i%h));
+            remainingCells.Add(new Cell(i % w, i / w));
 
         int genSteps = 0;
         while(remainingCells.Count > 0 && genSteps < 0)
@@ -261,17 +260,18 @@ public class GridGenerator : MonoBehaviour
             PopulateMaze(result, visitedCells, ref currentCell);
             remainingCells.Remove(currentCell);
         }
+
         while(remainingCells.Count > 0)
         {
             genSteps++;
             
             PopulateMaze2(result, visitedCells, remainingCells);
+            foreach(Transform element in spawnedElements)
+                Destroy(element.gameObject);
+            DisplayMaze(result);
+            yield return null;
         }
-        foreach(Transform element in spawnedElements)
-            Destroy(element.gameObject);
         spawnedElements.Clear();
-        DisplayMaze(result);
-        yield return null;
         Debug.Log(genSteps);
     }
 
