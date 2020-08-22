@@ -46,8 +46,8 @@ public class Path
             for(int dir=0; dir<4; dir++)
             {
                 int nextCell = Grid.GetNeighbourCell(maze, pathCell.cell, dir);
-                
-                if(maze.IsMovementAllowed(pathCell.cell, dir) && (!cellDistances.ContainsKey(nextCell) || cellDistances[nextCell] > pathCell.distance + 1))
+                Cell cell = new Cell(pathCell.cell % maze.w, pathCell.cell / maze.w);
+                if(maze.IsMovementAllowed(cell, dir) && (!cellDistances.ContainsKey(nextCell) || cellDistances[nextCell] > pathCell.distance + 1))
                 {
                     previousCells[nextCell] = pathCell.cell;
                     cellDistances[nextCell] = pathCell.distance + 1;

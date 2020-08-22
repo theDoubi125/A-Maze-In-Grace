@@ -18,9 +18,11 @@ public class TestCharacter : MonoBehaviour
     void Update()
     {
         time -= Time.deltaTime;
-        if(!moving && Input.GetMouseButtonDown(0))
+        RaycastHit hit;
+        Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+        if(!moving && Input.GetMouseButtonDown(0) && Physics.Raycast(ray, out hit))
         {
-            Vector3 worldMousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            Vector3 worldMousePos = hit.point;
             int targetX;
             int targetY;
             int targetCell = Grid.WorldPosToCell(GridGenerator.instance, worldMousePos, out targetX, out targetY);
