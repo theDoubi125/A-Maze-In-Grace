@@ -69,6 +69,7 @@ public class Maze
     public int w;
     public int h;
     public List<Wall> walls = new List<Wall>();
+    public Cell exitCell;
     public bool IsMovementAllowed(Cell cell, int direction)
     {
         int dx = 0;
@@ -110,20 +111,14 @@ public class Maze
 
 public class GridGenerator : MonoBehaviour
 {
-    public int w, h;
     public Transform emptyCellPrefab;
     public Transform wallPrefab;
+    public Transform columnPrefab;
+    public Transform exitPrefab;
     public float cellSize;
     public Transform noteCursor;
     public static Maze instance;
     private List<Transform> spawnedElements = new List<Transform>();
-    
-
-    private void Start()
-    {
-        StartCoroutine(GenerateMaze());
-        DisplayMaze(instance);
-    }
 
     public void MakeRoom(Cell topLeftCorner, Cell bottomRightCorner, List<Cell> visitedCells, List<Wall> walls)
     {
@@ -137,13 +132,13 @@ public class GridGenerator : MonoBehaviour
         }
     }
     
-    public void PopulateMaze(Maze maze, List<Cell> visitedCells, ref Cell currentCell)
+    public void PopulateMazeAldousBroder(Maze maze, List<Cell> visitedCells, ref Cell currentCell)
     {
         int dx = 0;
         int dy = 0;
         List<int> availableDirections = new List<int>();
-        if(currentCell.x < w - 1) availableDirections.Add(0);
-        if(currentCell.y < h - 1) availableDirections.Add(1);
+        if(currentCell.x < maze.w - 1) availableDirections.Add(0);
+        if(currentCell.y < maze.h - 1) availableDirections.Add(1);
         if(currentCell.x > 0) availableDirections.Add(2);
         if(currentCell.y > 0) availableDirections.Add(3);
         
@@ -172,13 +167,14 @@ public class GridGenerator : MonoBehaviour
         noteCursor.localPosition = new Vector3(currentCell.x, currentCell.y, 0);
     }
 
-    void RemoveWalls(Maze maze, List<Cell> path, List<Cell> visitedCells, List<Cell> remainingCells)
+    void RemoveWallsAlongPath(Maze maze, List<Cell> path, List<Cell> visitedCells, List<Cell> remainingCells)
     {
+        path.Reverse();
         for(int i=0; i<path.Count - 1; i++)
         {
             Cell A = path[i];
             Cell B = path[i + 1];
-            if(!visitedCells.Contains(B) || i == path.Count - 2)
+            if(!visitedCells.Contains(B))
             {
                 int dx = B.x - A.x;
                 int dy = B.y - A.y;
@@ -198,20 +194,19 @@ public class GridGenerator : MonoBehaviour
     private List<Cell> debugCells = new List<Cell>();
     public Transform debugPrefab;
 
-    void PopulateMaze2(Maze maze, List<Cell> visitedCells, List<Cell> remainingCells)
+    void PopulateMazeWilson(Maze maze, List<Cell> visitedCells, List<Cell> remainingCells)
     {
         Cell cursor = remainingCells[Random.Range(0, remainingCells.Count)];
-        debugCells.Clear();
         remainingCells.Remove(cursor);
         List<Cell> path = new List<Cell>();
         
+        path.Add(cursor);
+        debugCells.Add(cursor);
         while(!visitedCells.Contains(cursor))
         {
-            path.Add(cursor);
-            debugCells.Add(cursor);
             List<int> availableDirections = new List<int>();
-            if(cursor.x < w - 1) availableDirections.Add(0);
-            if(cursor.y < h - 1) availableDirections.Add(1);
+            if(cursor.x < maze.w - 1) availableDirections.Add(0);
+            if(cursor.y < maze.h - 1) availableDirections.Add(1);
             if(cursor.x > 0) availableDirections.Add(2);
             if(cursor.y > 0) availableDirections.Add(3);
             
@@ -226,17 +221,21 @@ public class GridGenerator : MonoBehaviour
             }
             cursor.x += dx;
             cursor.y += dy;
+            path.Add(cursor);
+            debugCells.Add(cursor);
         }
-        RemoveWalls(maze, path, visitedCells, remainingCells);
+        RemoveWallsAlongPath(maze, path, visitedCells, remainingCells);
     }
 
-    public IEnumerator GenerateMaze()
+    public Maze GenerateMaze(int w, int h)
     {
         Maze result = new Maze();
         instance = result;
         result.w = w;
         result.h = h;
         Cell currentCell = new Cell(Random.Range(0, w), Random.Range(0, h));
+        result.exitCell = new Cell(Random.Range(0, w), Random.Range(0, h));
+        
         for(int i=0; i <= w; i++)
         {
             for(int j=0; j <= h; j++)
@@ -254,36 +253,48 @@ public class GridGenerator : MonoBehaviour
             remainingCells.Add(new Cell(i % w, i / w));
 
         int genSteps = 0;
-        while(remainingCells.Count > 0 && genSteps < 0)
+        while(remainingCells.Count > 0 && genSteps < 5000)
         {
             genSteps++;
-            PopulateMaze(result, visitedCells, ref currentCell);
+            PopulateMazeAldousBroder(result, visitedCells, ref currentCell);
             remainingCells.Remove(currentCell);
         }
 
         while(remainingCells.Count > 0)
         {
+           
             genSteps++;
-            
-            PopulateMaze2(result, visitedCells, remainingCells);
-            foreach(Transform element in spawnedElements)
-                Destroy(element.gameObject);
-            DisplayMaze(result);
-            yield return null;
+            PopulateMazeWilson(result, visitedCells, remainingCells);
         }
+        foreach(Transform element in spawnedElements)
+            Destroy(element.gameObject);
         spawnedElements.Clear();
+        debugCells.Clear();
         Debug.Log(genSteps);
+        return result;
     }
 
-    private void DisplayMaze(Maze maze)
+    public void DisplayMaze(Maze maze)
     {
-        for(int i=0; i<w; i++)
+        for(int i=0; i<maze.w; i++)
         {
-            for(int j=0; j<h; j++)
+            for(int j=0; j<maze.h; j++)
             {
-                Transform emptyCell = Instantiate(emptyCellPrefab, transform);
+                Transform cellPrefab = emptyCellPrefab;
+                if(i == maze.exitCell.x && j == maze.exitCell.y)
+                    cellPrefab = exitPrefab;
+                Transform emptyCell = Instantiate(cellPrefab, transform);
                 emptyCell.localPosition = new Vector3(i * cellSize, j * cellSize);
                 spawnedElements.Add(emptyCell);
+            }
+        }
+        for(int i=0; i<=maze.w; i++)
+        {
+            for(int j=0; j<=maze.h; j++)
+            {
+                Transform column = Instantiate(columnPrefab, transform);
+                column.localPosition = new Vector3(i * cellSize - 0.5f, j * cellSize - 0.5f, -0.51f);
+                spawnedElements.Add(column);
             }
         }
         foreach(Wall wall in maze.walls)

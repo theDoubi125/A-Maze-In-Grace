@@ -10,9 +10,13 @@ public class TestCharacter : MonoBehaviour
     private float pathTime = 0;
     private bool moving = false;
 
+    private Animator animator;
+
+    public System.Action<Cell> stopAtCellDelegate; 
+
     void Start()
     {
-        
+        animator = GetComponentInChildren<Animator>();
     }
 
     void Update()
@@ -32,6 +36,7 @@ public class TestCharacter : MonoBehaviour
                 path = Path.PathFind(GridGenerator.instance, currentCell, targetCell, 10);
                 path.Insert(0, currentCell);
                 moving = true;
+                animator.SetBool("Moving", true);
                 pathTime = 0;
             }
         }
@@ -40,7 +45,9 @@ public class TestCharacter : MonoBehaviour
             pathTime += Time.deltaTime * movementSpeed;
             if(pathTime >= path.Count - 1)
             {
+                animator.SetBool("Moving", false);
                 moving = false;
+                int currentCell = Grid.WorldPosToCell(GridGenerator.instance, transform.position);
             }
             else
             {
@@ -48,6 +55,14 @@ public class TestCharacter : MonoBehaviour
                 Vector3 A = Grid.CellToWorldPos(GridGenerator.instance, path[step]);
                 Vector3 B = Grid.CellToWorldPos(GridGenerator.instance, path[step + 1]);
                 transform.position = A + (B - A) * (pathTime - step);
+                if(B.x - A.x > 0)
+                    animator.SetInteger("Direction", 0);
+                if(B.x - A.x < 0)
+                    animator.SetInteger("Direction", 2);
+                if(B.y - A.y > 0)
+                    animator.SetInteger("Direction", 1);
+                if(B.y - A.y < 0)
+                    animator.SetInteger("Direction", 3);
             }
         }
     }
